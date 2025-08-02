@@ -23,7 +23,7 @@ const onFileUpload = (event) => {
       }
 
       rawData.value = results.data
-      extractExperiments()
+      extractData()
     },
   })
 }
@@ -31,10 +31,12 @@ const onFileUpload = (event) => {
 const experimentList = ref([])
 const selectedExperiments = ref([])
 
-const extractExperiments = () => {
+const extractData = () => {
   const exps = [...new Set(rawData.value.map((row) => row.experiment_id))]
-  console.log('📊 Список експериментів:', exps)
+  const metrics = [...new Set(rawData.value.map((row) => row.metric_name))]
+
   experimentList.value = exps.map((id) => ({ label: id, value: id }))
+  metricList.value = metrics.map((m) => ({ label: m, value: m }))
 }
 
 const chartData = ref(null)
@@ -55,16 +57,20 @@ function downsample(data, maxPoints = 300) {
 
 const buildChartData = () => {
   const datasets = []
-  const metrics = [...new Set(rawData.value.map((row) => row.metric_name))]
 
-  for (const metric of metrics) {
+  const metricsToUse = selectedMetrics.value.length
+    ? selectedMetrics.value
+    : [...new Set(rawData.value.map((row) => row.metric_name))]
+
+  for (const metric of metricsToUse) {
     for (const expId of selectedExperiments.value) {
       const dataPoints = rawData.value
         .filter((r) => r.experiment_id === expId && r.metric_name === metric)
         .map((r) => ({ x: Number(r.step), y: Number(r.value) }))
 
-      if (dataPoints.length > 0) {
-        const sampledPoints = downsample(dataPoints)
+      const sampledPoints = downsample(dataPoints, 300)
+
+      if (sampledPoints.length > 0) {
         datasets.push({
           label: `${expId} - ${metric}`,
           data: sampledPoints,
@@ -78,6 +84,7 @@ const buildChartData = () => {
 
   return { datasets }
 }
+
 
 const chartOptions = {
   responsive: true,
@@ -102,7 +109,8 @@ function randomColor() {
   return `rgb(${r},${g},${b})`
 }
 
-
+const metricList = ref([])
+const selectedMetrics = ref([])
 </script>
 
 <template>
@@ -124,6 +132,16 @@ function randomColor() {
         filter
         placeholder="Select experiments"
         class="w-full card"
+      />
+    </div>
+    <div v-if="metricList.length" class="mt-4">
+      <MultiSelect
+        v-model="selectedMetrics"
+        :options="metricList"
+        optionLabel="label"
+        optionValue="value"
+        placeholder="Оберіть метрики"
+        class="w-full"
       />
     </div>
 
