@@ -17,5 +17,5 @@ Interactive web application for visualizing machine learning experiment metrics 
 
 ## Application Link
 
-[Open MLOps Experiment Viewer](https://your-app-url.com)
+[Open MLOps Experiment Viewer](https://mlops-app-beta.vercel.app/)
 
