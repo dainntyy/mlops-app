@@ -12,6 +12,7 @@ import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Card from 'primevue/card'
 import ProgressSpinner from 'primevue/progressspinner'
+import Slider from 'primevue/slider'
 
 import Noir from './presets/Noir.js'
 
@@ -36,5 +37,6 @@ app.component('Chart', Chart)
 app.component('Button', Button)
 app.component('Card', Card)
 app.component('ProgressSpinner', ProgressSpinner)
+app.component('Slider', Slider)
 
 app.mount('#app')

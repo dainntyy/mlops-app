@@ -1,11 +1,6 @@
 <script setup>
 import Papa from 'papaparse'
-import { ref } from 'vue'
-import ProgressSpinner from 'primevue/progressspinner'
-import MultiSelect from 'primevue/multiselect'
-import Button from 'primevue/button'
-import Chart from 'primevue/chart'
-import Slider from 'primevue/slider'
+import { ref, toRaw } from 'vue'
 
 const rawData = ref([])
 const isExtracting = ref(false)
@@ -18,6 +13,8 @@ const chartData = ref(null)
 const maxPoints = ref(300)
 const fileInputRef = ref(null)
 const uploadedFileName = ref('')
+const isDragActive = ref(false)
+const chartRef = ref(null)
 
 function triggerFileInput() {
   if (fileInputRef.value && !uploadedFileName.value) {
@@ -40,6 +37,22 @@ const onFileUpload = (event) => {
       isExtracting.value = false
     },
   })
+}
+
+function onDragOver() {
+  if (!uploadedFileName.value) isDragActive.value = true
+}
+function onDragLeave() {
+  isDragActive.value = false
+}
+function onDrop(e) {
+  isDragActive.value = false
+  if (uploadedFileName.value) return
+  const file = e.dataTransfer.files[0]
+  if (file && file.type === 'text/csv') {
+    fileInputRef.value.files = e.dataTransfer.files
+    onFileUpload({ target: { files: e.dataTransfer.files } })
+  }
 }
 
 const extractData = () => {
@@ -155,7 +168,21 @@ function resetApp() {
         accept=".csv"
         class="hidden-file-input"
       />
-      <div class="file-upload-row">
+
+      <div
+        class="drop-area"
+        :class="{ 'drop-area-active': isDragActive }"
+        @dragover.prevent="onDragOver"
+        @dragleave.prevent="onDragLeave"
+        @drop.prevent="onDrop"
+      >
+        <input
+          ref="fileInputRef"
+          type="file"
+          @change="onFileUpload"
+          accept=".csv"
+          class="hidden-file-input"
+        />
         <Button
           icon="pi pi-upload"
           class="p-button w-full file-upload-btn"
@@ -163,7 +190,10 @@ function resetApp() {
           :disabled="!!uploadedFileName"
           aria-label="Upload CSV"
         />
-        <span v-if="uploadedFileName" class="file-name-label">{{ uploadedFileName }}</span>
+        <span v-if="uploadedFileName" class="file-name-label" style="padding-left: 1rem;">{{ uploadedFileName }}</span>
+        <div v-if="!uploadedFileName" class="drop-text">
+          Drag & Drop CSV file here or click the upload icon
+        </div>
       </div>
 
       <div v-if="isExtracting" class="centered">
@@ -219,6 +249,7 @@ function resetApp() {
         </div>
 
         <div v-if="chartData && !isChartLoading" class="mt-6 chart-card">
+          <h3 class="title centered">Experiment Metrics Chart</h3>
           <Chart
             :key="selectedExperiments.join(',') + maxPoints"
             type="line"
@@ -315,6 +346,26 @@ body,
   flex-direction: column;
   align-items: center;
   justify-content: center;
+}
+
+.drop-area {
+  border: 2px dashed #a0aec0;
+  border-radius: 12px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  background: #f7fafc;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+.drop-area-active {
+  border-color: #5a67d8;
+  background: #ebf4ff;
+}
+.drop-text {
+  color: #718096;
+  font-size: 1rem;
+  margin-top: 0.5rem;
 }
 
 .loading-label {
