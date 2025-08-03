@@ -1,35 +1,45 @@
 <script setup>
 import Papa from 'papaparse'
 import { ref } from 'vue'
+import ProgressSpinner from 'primevue/progressspinner'
+import MultiSelect from 'primevue/multiselect'
+import Button from 'primevue/button'
+import Chart from 'primevue/chart'
+import Slider from 'primevue/slider'
+
 const rawData = ref([])
+const isExtracting = ref(false)
+const isChartLoading = ref(false)
+
+const experimentList = ref([])
+const selectedExperiments = ref([])
+const metricList = ref([])
+const selectedMetrics = ref([])
+const chartData = ref(null)
+const maxPoints = ref(300)
+const fileInputRef = ref(null)
+
+function triggerFileInput() {
+  if (fileInputRef.value) {
+    fileInputRef.value.click()
+  }
+}
+
 const onFileUpload = (event) => {
   const file = event.target.files[0]
   if (!file) return
 
+  isExtracting.value = true
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: (results) => {
-      console.log('✅ CSV parsed:', results)
-
-      const requiredColumns = ['experiment_id', 'metric_name', 'step', 'value']
-      const firstRow = results.data[0]
-
-      const isValid = requiredColumns.every((col) => col in firstRow)
-
-      if (!isValid) {
-        alert('❌ CSV має містити колонки: experiment_id, metric_name, step, value')
-        return
-      }
-
       rawData.value = results.data
       extractData()
+      isExtracting.value = false
     },
   })
 }
-
-const experimentList = ref([])
-const selectedExperiments = ref([])
 
 const extractData = () => {
   const exps = [...new Set(rawData.value.map((row) => row.experiment_id))]
@@ -39,19 +49,23 @@ const extractData = () => {
   metricList.value = metrics.map((m) => ({ label: m, value: m }))
 }
 
-const chartData = ref(null)
-
 const updateChart = () => {
-  const data = buildChartData()
-  if (data.datasets.length === 0) {
-    alert('⚠️ Немає даних для побудови графіку. Перевір експерименти або метрики.')
-    return
-  }
-  chartData.value = data
+  isChartLoading.value = true
+  setTimeout(() => {
+    const data = buildChartData()
+    if (data.datasets.length === 0) {
+      alert('⚠️ No data for chart found. Check experiments or metrics.')
+      isChartLoading.value = false
+      return
+    }
+    chartData.value = data
+    isChartLoading.value = false
+  }, 600)
 }
-function downsample(data, maxPoints = 300) {
-  if (data.length <= maxPoints) return data
-  const step = Math.floor(data.length / maxPoints)
+
+function downsample(data, maxPointsVal = 300) {
+  if (data.length <= maxPointsVal) return data
+  const step = Math.floor(data.length / maxPointsVal)
   return data.filter((_, index) => index % step === 0)
 }
 
@@ -68,7 +82,7 @@ const buildChartData = () => {
         .filter((r) => r.experiment_id === expId && r.metric_name === metric)
         .map((r) => ({ x: Number(r.step), y: Number(r.value) }))
 
-      const sampledPoints = downsample(dataPoints, 300)
+      const sampledPoints = downsample(dataPoints, maxPoints.value)
 
       if (sampledPoints.length > 0) {
         datasets.push({
@@ -84,7 +98,6 @@ const buildChartData = () => {
 
   return { datasets }
 }
-
 
 const chartOptions = {
   responsive: true,
@@ -109,75 +122,186 @@ function randomColor() {
   return `rgb(${r},${g},${b})`
 }
 
-const metricList = ref([])
-const selectedMetrics = ref([])
+// Функція для ресету
+function resetApp() {
+  rawData.value = []
+  experimentList.value = []
+  selectedExperiments.value = []
+  metricList.value = []
+  selectedMetrics.value = []
+  chartData.value = null
+  maxPoints.value = 300
+  isExtracting.value = false
+  isChartLoading.value = false
+  if (fileInputRef.value) {
+    fileInputRef.value.value = null // очищаємо файл
+  }
+}
 </script>
 
 <template>
-  <div class="container">
-    <h2 class="title">MLOps Experiment Viewer</h2>
-    <input type="file" @change="onFileUpload" accept=".csv" />
-
-    <!-- <div>
-      <h3>DEBUG: experimentList</h3>
-      <pre>{{ experimentList }}</pre>
-    </div> -->
-
-    <div v-if="experimentList.length" class="mt-4">
-      <MultiSelect
-        v-model="selectedExperiments"
-        :options="experimentList"
-        optionLabel="label"
-        optionValue="value"
-        filter
-        placeholder="Select experiments"
-        class="w-full card"
+  <div class="main-bg">
+    <div class="container card">
+      <div class="header-row">
+        <h2 class="title">MLOps Experiment Viewer</h2>
+        <Button
+          icon="pi pi-refresh"
+          class="p-button-rounded p-button-text reset-btn"
+          @click="resetApp"
+          aria-label="Reset"
+        >
+          <span class="arrow-icon">&#x21bb;</span>
+        </Button>
+      </div>
+      <input
+        ref="fileInputRef"
+        type="file"
+        @change="onFileUpload"
+        accept=".csv"
+        class="hidden-file-input"
       />
-    </div>
-    <div v-if="metricList.length" class="mt-4">
-      <MultiSelect
-        v-model="selectedMetrics"
-        :options="metricList"
-        optionLabel="label"
-        optionValue="value"
-        placeholder="Оберіть метрики"
-        class="w-full"
+      <Button
+        icon="pi pi-upload"
+        class="p-button w-full file-upload-btn"
+        @click="triggerFileInput"
+        aria-label="Upload CSV"
       />
-    </div>
 
-    <div v-if="selectedExperiments.length" class="mt-4">
-      <Button label="Побудувати графік" @click="updateChart" />
-    </div>
+      <div v-if="isExtracting" class="centered">
+        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
+        <div class="loading-label">Loading experiments...</div>
+      </div>
 
-    <div v-if="chartData" class="mt-6">
-      <Chart
-        :key="selectedExperiments.join(',')"
-        type="line"
-        :data="buildChartData()"
-        :options="chartOptions"
-      />
+      <div v-if="isExtracting" class="centered">
+        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
+        <div class="loading-label">Loading experiments...</div>
+      </div>
+
+      <div v-else>
+        <div v-if="experimentList.length" class="mt-4">
+          <MultiSelect
+            v-model="selectedExperiments"
+            :options="experimentList"
+            optionLabel="label"
+            optionValue="value"
+            display="chip"
+            filter
+            placeholder="Select experiments"
+            class="w-full"
+          />
+        </div>
+        <div v-if="selectedExperiments.length && metricList.length" class="mt-4">
+          <MultiSelect
+            v-model="selectedMetrics"
+            :options="metricList"
+            optionLabel="label"
+            optionValue="value"
+            display="chip"
+            filter
+            placeholder="Choose metrics"
+            class="w-full"
+          />
+        </div>
+
+        <div v-if="selectedExperiments.length" class="mt-4">
+          <label for="points-slider" class="slider-label">Number of points on the chart: {{ maxPoints }}</label>
+          <Slider
+            id="points-slider"
+            v-model="maxPoints"
+            :min="50"
+            :max="1000"
+            :step="10"
+            class="w-full"
+          />
+        </div>
+
+        <div v-if="selectedExperiments.length" class="mt-4">
+          <Button label="Build a chart" @click="updateChart" class="p-button w-full" />
+        </div>
+
+        <div v-if="isChartLoading" class="centered mt-6">
+          <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
+          <div class="loading-label">Building chart...</div>
+        </div>
+
+        <div v-if="chartData && !isChartLoading" class="mt-6 chart-card">
+          <Chart
+            :key="selectedExperiments.join(',') + maxPoints"
+            type="line"
+            :data="buildChartData()"
+            :options="chartOptions"
+            class="Chart"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <style>
-body {
-  font-family: 'Segoe UI', sans-serif;
-  background-color: #f9fafb;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
+body,
+.main-bg {
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #f3f4f8 0%, #e9ecef 100%);
+  min-height: 100vh;
   margin: 0;
   padding: 0;
 }
 
-.container {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2rem;
+.main-bg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.container.card {
+  max-width: 650px;
+  width: 100%;
+  border-radius: 18px;
+  box-shadow: 0 6px 32px rgba(60, 72, 88, 0.12);
+  background: #fff;
+  padding: 2rem 2.5rem;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2d3748;
+  letter-spacing: -1px;
+  margin-bottom: 1.5rem;
+}
+
+.reset-btn {
+  margin-left: 1rem;
   font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
+  color: #5a67d8;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.arrow-icon {
+  font-size: 1.7rem;
+  vertical-align: middle;
+}
+
+.file-input {
+  margin-bottom: 1.5rem;
+}
+.hidden-file-input {
+  display: none;
+}
+.file-upload-btn {
+  margin-bottom: 1.5rem;
 }
 
 .w-full {
@@ -185,10 +309,38 @@ body {
 }
 
 .mt-4 {
-  margin-top: 1rem;
+  margin-top: 1.5rem;
 }
 
 .mt-6 {
-  margin-top: 1.5rem;
+  margin-top: 2rem;
+}
+
+.chart-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(60, 72, 88, 0.07);
+  padding: 1rem;
+}
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-label {
+  margin-top: 0.75rem;
+  color: #5a67d8;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+.slider-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #4c51bf;
 }
 </style>
