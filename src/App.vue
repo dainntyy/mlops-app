@@ -10,7 +10,6 @@ import Slider from 'primevue/slider'
 const rawData = ref([])
 const isExtracting = ref(false)
 const isChartLoading = ref(false)
-
 const experimentList = ref([])
 const selectedExperiments = ref([])
 const metricList = ref([])
@@ -18,9 +17,10 @@ const selectedMetrics = ref([])
 const chartData = ref(null)
 const maxPoints = ref(300)
 const fileInputRef = ref(null)
+const uploadedFileName = ref('')
 
 function triggerFileInput() {
-  if (fileInputRef.value) {
+  if (fileInputRef.value && !uploadedFileName.value) {
     fileInputRef.value.click()
   }
 }
@@ -29,6 +29,7 @@ const onFileUpload = (event) => {
   const file = event.target.files[0]
   if (!file) return
 
+  uploadedFileName.value = file.name
   isExtracting.value = true
   Papa.parse(file, {
     header: true,
@@ -44,7 +45,6 @@ const onFileUpload = (event) => {
 const extractData = () => {
   const exps = [...new Set(rawData.value.map((row) => row.experiment_id))]
   const metrics = [...new Set(rawData.value.map((row) => row.metric_name))]
-
   experimentList.value = exps.map((id) => ({ label: id, value: id }))
   metricList.value = metrics.map((m) => ({ label: m, value: m }))
 }
@@ -71,19 +71,15 @@ function downsample(data, maxPointsVal = 300) {
 
 const buildChartData = () => {
   const datasets = []
-
   const metricsToUse = selectedMetrics.value.length
     ? selectedMetrics.value
     : [...new Set(rawData.value.map((row) => row.metric_name))]
-
   for (const metric of metricsToUse) {
     for (const expId of selectedExperiments.value) {
       const dataPoints = rawData.value
         .filter((r) => r.experiment_id === expId && r.metric_name === metric)
         .map((r) => ({ x: Number(r.step), y: Number(r.value) }))
-
       const sampledPoints = downsample(dataPoints, maxPoints.value)
-
       if (sampledPoints.length > 0) {
         datasets.push({
           label: `${expId} - ${metric}`,
@@ -95,7 +91,6 @@ const buildChartData = () => {
       }
     }
   }
-
   return { datasets }
 }
 
@@ -122,7 +117,6 @@ function randomColor() {
   return `rgb(${r},${g},${b})`
 }
 
-// Функція для ресету
 function resetApp() {
   rawData.value = []
   experimentList.value = []
@@ -133,8 +127,9 @@ function resetApp() {
   maxPoints.value = 300
   isExtracting.value = false
   isChartLoading.value = false
+  uploadedFileName.value = ''
   if (fileInputRef.value) {
-    fileInputRef.value.value = null // очищаємо файл
+    fileInputRef.value.value = null
   }
 }
 </script>
@@ -160,16 +155,15 @@ function resetApp() {
         accept=".csv"
         class="hidden-file-input"
       />
-      <Button
-        icon="pi pi-upload"
-        class="p-button w-full file-upload-btn"
-        @click="triggerFileInput"
-        aria-label="Upload CSV"
-      />
-
-      <div v-if="isExtracting" class="centered">
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="4" />
-        <div class="loading-label">Loading experiments...</div>
+      <div class="file-upload-row">
+        <Button
+          icon="pi pi-upload"
+          class="p-button w-full file-upload-btn"
+          @click="triggerFileInput"
+          :disabled="!!uploadedFileName"
+          aria-label="Upload CSV"
+        />
+        <span v-if="uploadedFileName" class="file-name-label">{{ uploadedFileName }}</span>
       </div>
 
       <div v-if="isExtracting" class="centered">
@@ -293,15 +287,8 @@ body,
   font-size: 1.7rem;
   vertical-align: middle;
 }
-
-.file-input {
-  margin-bottom: 1.5rem;
-}
 .hidden-file-input {
   display: none;
-}
-.file-upload-btn {
-  margin-bottom: 1.5rem;
 }
 
 .w-full {
@@ -342,5 +329,17 @@ body,
   margin-bottom: 0.5rem;
   font-weight: 500;
   color: #4c51bf;
+}
+
+.file-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.file-name-label {
+  font-size: 1rem;
+  color: #4c51bf;
+  font-weight: 500;
 }
 </style>
