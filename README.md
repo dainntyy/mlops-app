@@ -1,29 +1,21 @@
-# mlops-experiment-viewer
+# MLOps Experiment Viewer
 
-This template should help get you started developing with Vue 3 in Vite.
+Interactive web application for visualizing machine learning experiment metrics from CSV files.
 
-## Recommended IDE Setup
+## Features
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Drag & Drop CSV upload
+- Select experiments and metrics
+- Interactive chart with scaling
+- Modern UI (PrimeVue)
 
-## Customize configuration
+## Usage
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+1. Clone the repository
+2. Install dependencies
+3. Run the app
 
-## Project Setup
+## Application Link
 
-```sh
-npm install
-```
+[Open MLOps Experiment Viewer](https://your-app-url.com)
 
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Compile and Minify for Production
-
-```sh
-npm run build
-```
